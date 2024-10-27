@@ -2,6 +2,7 @@ enable_testing()
 
 add_executable(acppJsonTests
     main.cpp
+    parser_test.cpp
 )
 
 target_include_directories(acppJsonTests 
@@ -12,5 +13,13 @@ PUBLIC
 
 target_link_libraries(acppJsonTests PRIVATE acppJson)
 
+target_link_libraries(acppJsonTests 
+PRIVATE
+    gtest::gtest
+    spdlog::spdlog
+)
+
 # Add tests
 add_test(NAME libacppJsonTests COMMAND libacpp-json)
+
+
