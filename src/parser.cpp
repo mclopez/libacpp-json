@@ -1,10 +1,16 @@
-#include <libacpp-json/parser.h>
+//  Copyright Marcos Cambón-López 2024.
+
+// Distributed under the Mozilla Public License Version 2.0.
+//    (See accompanying file LICENSE or copy at
+//          https://www.mozilla.org/en-US/MPL/2.0/)
 
 
 
 #include <iostream>
 #include <memory>
 #include <vector>
+
+#include <libacpp-json/parser.h>
 
 //enum class ParseResult {ok, partial, error};
 
@@ -548,6 +554,7 @@ ParseResult StringParser::parse(const char*& p, const char* end) {
                     uniCount_ = 0;
                     unicode_ = 0;
                 }
+                //TODO: fix chars beyond Basic Multilingual Plane
                 break;    
             case Status::unicode:
                 if (is_hex(*p, v) && uniCount_ < 4) {
@@ -575,6 +582,85 @@ ParseResult StringParser::parse(const char*& p, const char* end) {
     return ParseResult::partial;
 }
 
+
+ParseResult IntegerParser::parse(const char*& p, const char* end) {
+    while(p != end) {
+        switch(status_) {
+            case Status::begin:
+                result_ = 0;
+                frac_ = 0;
+                exp_ = 0;
+                if (*p == '0') {
+                    ++p;
+                    status_  = Status::begin;
+                    return ParseResult::ok;
+                } else if ( *p == '-') {
+                    sign_ = -1;
+                    status_ = Status::integer;
+                } else if ( *p == '+') {
+                    sign_ = +1;
+                    status_ = Status::integer;
+                } else if ( '1' <= *p && *p <= '9') {
+                    result_ = *p - '0';
+                    status_ = Status::integer;
+                }
+                break;
+            case Status::integer:
+                if ( '0' <= *p && *p <= '9') {
+                    result_ = (result_ * 10) + sign_ * (*p - '0');
+                } else if (*p == '.')  {
+                        status_ = Status::frac;    
+                }else if (*p == 'e' || *p == 'E') {
+                    status_ = Status::exp;
+                }
+                break;
+            case Status::frac:
+                if ( '0' <= *p && *p <= '9') {
+                    frac_ = (frac_ * 10) + (*p - '0');
+                    status_ = Status::frac2;
+                } else {
+                    return ParseResult::error;
+                }
+                break;
+            case Status::frac2:
+                if ( '0' <= *p && *p <= '9') {
+                    frac_ = (frac_ * 10) + (*p - '0');
+                }else if (*p == 'e' || *p == 'E') {
+                    status_ = Status::exp;
+                } else {
+                    return ParseResult::error;
+                }
+                break;
+            case Status::exp:
+                sign_ = +1;
+                if ( *p == '-') {
+                    sign_ = -1;
+                    status_ = Status::exp2;
+                } else if ( *p == '+') {
+                    sign_ = +1;
+                    status_ = Status::exp2;
+                } else if ( '0' <= *p && *p <= '9') {
+                    exp_ = (exp_ * 10) + sign_ * (*p - '0');
+                    status_ = Status::exp2;
+                } else {
+                    return ParseResult::error;
+                }
+                break;
+            case Status::exp2:
+                if ( '0' <= *p && *p <= '9') {
+                    exp_ = (exp_ * 10) + sign_ * (*p - '0');
+                    //status_ = Status::exp2;
+                } else {
+                    return ParseResult::error;
+                }
+                break;
+            default:
+                break;
+        }
+        ++p;
+    }
+    return ParseResult::partial;
+}
 
 
 } // namespace libacpp::json

@@ -1,19 +1,11 @@
+//  Copyright Marcos Cambón-López 2024.
 
-/*
-#include <iostream>
+// Distributed under the Mozilla Public License Version 2.0.
+//    (See accompanying file LICENSE or copy at
+//          https://www.mozilla.org/en-US/MPL/2.0/)
 
-#include <libacpp-json/parser.h>
-
-
-int main(){
-    std::cout << "..." << std::endl;
-}
-
-*/
 #include <gtest/gtest.h> // googletest header file
-
 #include "libacpp-json/log.h"
-
 #include <libacpp-json/parser.h>
 
 

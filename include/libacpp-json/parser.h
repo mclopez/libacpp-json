@@ -1,3 +1,9 @@
+//  Copyright Marcos Cambón-López 2024.
+
+// Distributed under the Mozilla Public License Version 2.0.
+//    (See accompanying file LICENSE or copy at
+//          https://www.mozilla.org/en-US/MPL/2.0/)
+
 #pragma once
 
 #include <string>
@@ -75,6 +81,19 @@ private:
     uint32_t unicode_;
 };
 
+class IntegerParser: public JsonParser {
+public:
+    IntegerParser(int& result, int& frac, int& exp):result_(result), frac_(frac), exp_(exp), status_(Status::begin), sign_(1){}
+    ParseResult parse(const char*& p, const char* end) override; 
+
+private:
+    enum class Status {begin, integer, frac, frac2, exp, exp_sign, exp_val1, exp2};
+    Status status_;
+    int& result_;
+    int sign_;
+    int& frac_;
+    int& exp_;
+};
 
 
 }// namespace libacpp::json
