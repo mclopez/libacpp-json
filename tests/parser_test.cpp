@@ -13,7 +13,7 @@
 using namespace libacpp::json;
 
 
-TEST(ParserTests, utf)
+TEST(ParserTests, Utf)
 {
     struct Test {
     uint32_t codepoint;
@@ -33,15 +33,15 @@ tests[]{
     }
 }
 
-TEST(ParserTests, string)
+TEST(ParserTests, String)
 {
 struct Test {
     std::string json;
     ParseResult parseResult;
     std::string result;
-} 
-tests[]{
+}tests[]{
     {R"("hello")", ParseResult::ok, "hello"}, 
+    {R"("hello)", ParseResult::partial, "hello"}, 
     {R"("hello\tworld!")", ParseResult::ok, "hello\tworld!"}, 
     {R"("hello\rworld!")", ParseResult::ok, "hello\rworld!"}, 
     {R"("hello\nworld!")", ParseResult::ok, "hello\nworld!"}, 
@@ -49,7 +49,6 @@ tests[]{
     {R"("hello world! \u00f1")", ParseResult::ok, "hello world! ñ"}, 
     {R"("\u0041 \u0042 \u0043 \u0044")", ParseResult::ok, "A B C D"}, 
 };
-    std::cout << "Hello!!"  << std::endl;
     for(const auto& t: tests) {
         std::string result;
         StringParser sp(result);
@@ -60,10 +59,24 @@ tests[]{
         JSON_LOG_DEBUG("json: {}", t.json);
         JSON_LOG_DEBUG("result: {}", t.result);
     }
+    for(const auto& t: tests) {
+        std::string result;
+        StringParser sp(result);
+        const char* p = t.json.data();
+        const char* end = p + t.json.size();
+        ParseResult r;
+        while (p != end) {
+            r = sp.parse(p, p+1);
+        }
+        EXPECT_EQ(r, t.parseResult) << "test 1";
+        EXPECT_EQ(result, t.result) << "test 2";
+        JSON_LOG_DEBUG("json: {}", t.json);
+        JSON_LOG_DEBUG("result: {}", t.result);
+    }
 }
 
 
-TEST(ParserTests, integer)
+TEST(ParserTests, Number)
 {
 struct Test {
     std::string json;
@@ -100,6 +113,8 @@ tests[]{
     {"-123.45e67", ParseResult::partial, -123, 45, 67}, 
     {"123.45e-67", ParseResult::partial, 123, 45, -67}, 
     {"-123.45e-67", ParseResult::partial, -123, 45, -67}, 
+    //TODO complete error cases??
+    {"abc", ParseResult::error, 0,0,0}, 
 };
     std::cout << "Hello!!"  << std::endl;
     for(const auto& t: tests) {
@@ -108,7 +123,7 @@ tests[]{
         int result;
         int frac;
         int exp;
-        IntegerParser sp(result, frac, exp);
+        NumberParser sp(result, frac, exp);
         const char* p = t.json.data();
         auto r = sp.parse(p, p+t.json.size());
         EXPECT_EQ(r, t.parseResult) << "test 1";
@@ -116,4 +131,114 @@ tests[]{
         EXPECT_EQ(frac, t.frac) << "test 3";
         EXPECT_EQ(exp, t.exp) << "test 4";
     }
+}
+
+
+
+TEST(ParserTests, Literal)
+{
+    struct Test {
+        std::string value;
+        std::string literal;
+        ParseResult parseResult;
+    } 
+    tests[]{
+        {"null", "null", ParseResult::ok}, 
+        {"true", "true", ParseResult::ok}, 
+        {"false", "false", ParseResult::ok}, 
+        {"Null", "null", ParseResult::error}, 
+        {"nUll", "null", ParseResult::error}, 
+        {"n", "null", ParseResult::partial}, 
+        {"nullxxx", "null", ParseResult::ok}, 
+    };
+    JSON_LOG_DEBUG("first test");
+    for(const auto& t: tests) {
+        std::string result;
+        LiteralParser sp(t.literal);
+        const char* p = t.value.data();
+        auto r = sp.parse(p, p + t.value.size());
+        EXPECT_EQ(r, t.parseResult) << "test1 " << t.value;
+    }
+    JSON_LOG_DEBUG("second test");
+    for(const auto& t: tests) {
+        std::string result;
+        LiteralParser sp(t.literal);
+        const char* p = t.value.data();
+        const char* end = p + t.value.size();
+        ParseResult r = ParseResult::partial;
+        while (p != end && r == ParseResult::partial) {
+            r = sp.parse(p, p+1);
+        }
+        EXPECT_EQ(r, t.parseResult) << "test1 " << t.value << " " << (int)r << " " <<  (int)t.parseResult;
+    }
+}
+
+
+
+TEST(ParserTests, Value)
+{
+    struct Test {
+        std::string value;
+        ParseResult parseResult;
+        std::string string;
+        int integer;
+        int frac;
+        int exp;
+    } 
+    tests[]{
+        {"null", ParseResult::ok}, 
+        {"true", ParseResult::ok}, 
+        {"false", ParseResult::ok}, 
+        {"Null", ParseResult::error}, 
+        {"nUll", ParseResult::error}, 
+        {"n", ParseResult::partial}, 
+        {"nullxxx", ParseResult::ok}, 
+        {R"("abc")", ParseResult::ok}, 
+        {R"("abc)", ParseResult::partial}, 
+        {"nullxxx", ParseResult::ok}, 
+    };
+    JSON_LOG_DEBUG("first test");
+    for(const auto& t: tests) {
+        JSON_LOG_DEBUG("testing {}", t.value);
+        std::string result;
+        ValueParser sp;
+        const char* p = t.value.data();
+        auto r = sp.parse(p, p + t.value.size());
+        EXPECT_EQ(r, t.parseResult) << "test 1 " << t.value << " " << (int)r << " " <<  (int)t.parseResult;
+        auto v = sp.value();
+        if (v)
+            JSON_LOG_DEBUG("value: {}", v->to_string());
+    }
+    JSON_LOG_DEBUG("second test");
+    int c =0;
+    for(const auto& t: tests) {
+        JSON_LOG_DEBUG("testing {}", t.value);
+        ++c;
+        std::string result;
+        ValueParser sp;
+        const char* p = t.value.data();
+        const char* end = p + t.value.size();
+        ParseResult r = ParseResult::partial;
+        while (p != end && r == ParseResult::partial) {
+            r = sp.parse(p, p+1);
+        }
+        EXPECT_EQ(r, t.parseResult) << "test 1 " << t.value << " " << (int)r << " " <<  (int)t.parseResult << " test: " << c; 
+        auto v = sp.value();
+        if (v)
+            JSON_LOG_DEBUG("value: {}", v->to_string());
+    }
+
+
+    // for(const auto& t: tests) {
+    //     std::string result;
+    //     LiteralParser sp(t.literal);
+    //     const char* p = t.value.data();
+    //     const char* end = p + t.value.size();
+    //     ParseResult r;
+    //     while (p != end && r == ParseResult::partial) {
+    //         r = sp.parse(p, p+1);
+    //     }
+    //     EXPECT_EQ(r, t.parseResult) << "test 1";
+    // }
+
 }

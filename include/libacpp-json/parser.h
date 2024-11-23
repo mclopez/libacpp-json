@@ -13,6 +13,56 @@ namespace libacpp::json {
 
 enum class ParseResult {ok, partial, error};
 
+std::string to_string(ParseResult r);
+
+
+enum class ValueType {undef, nil, boolean, number, string, object, array};
+
+class Value {
+public:
+    Value(ValueType type):type_(type){}
+    ValueType type() {return type_;}
+    virtual std::string to_string()=0;
+private:
+    ValueType type_; 
+};
+
+class NullValue: public Value {
+public:
+    NullValue():Value(ValueType::nil){}
+    std::string to_string() override {return "null";}
+private:
+};
+
+//TODO: template impl??
+class BoolValue: public Value {
+public:
+    BoolValue(bool v):Value(ValueType::boolean), value_(v){}
+    bool value() const { return value_;}
+    std::string to_string() override {return value_?"true":"false";}
+private:
+    bool value_;
+};
+
+class StringValue: public Value {
+public:
+    StringValue(const std::string& v):Value(ValueType::string), value_(v){}
+    std::string value() const { return value_;}
+    std::string to_string() override {return std::string("\"") + value_ + "\"";}
+private:
+    std::string value_;
+};
+
+class NumberValue: public Value {
+public:
+    NumberValue(int i, int f, int e):Value(ValueType::number), integer_(i), fraction_(f), exponent_(e){}
+    int value() const { return integer_;}
+    std::string to_string() override {return  std::to_string(integer_) + "/" + std::to_string(fraction_) + "/" + std::to_string(exponent_);}
+private:
+    int integer_;
+    int fraction_;
+    int exponent_;
+};
 
 class JsonParser {
 public:    
@@ -66,6 +116,9 @@ private:
 
 */
 
+
+
+
 std::vector<uint8_t> unicode_to_tf8(uint32_t codepoint);
 
 class StringParser: public JsonParser {
@@ -81,11 +134,10 @@ private:
     uint32_t unicode_;
 };
 
-class IntegerParser: public JsonParser {
+class NumberParser: public JsonParser {
 public:
-    IntegerParser(int& result, int& frac, int& exp):result_(result), frac_(frac), exp_(exp), status_(Status::begin), sign_(1){}
+    NumberParser(int& result, int& frac, int& exp):result_(result), frac_(frac), exp_(exp), status_(Status::begin), sign_(1){}
     ParseResult parse(const char*& p, const char* end) override; 
-
 private:
     enum class Status {begin, integer, frac, frac2, exp, exp_sign, exp_val1, exp2};
     Status status_;
@@ -93,6 +145,49 @@ private:
     int sign_;
     int& frac_;
     int& exp_;
+};
+
+class LiteralParser: public JsonParser {
+public:
+    LiteralParser(const std::string& literal):pos_(0), literal_(literal){}
+    ParseResult parse(const char*& p, const char* end) override; 
+
+private:
+    size_t pos_;
+    const std::string& literal_;
+};
+
+class ValueParser: public JsonParser {
+public:
+    ValueParser()
+    :status_(Status::begin),
+    null_parser_(null_val),true_parser_(true_val), false_parser_(false_val),
+    number_parser_(integer_, frac_, exp_), string_parser_(string_), type_(ValueType::undef)
+    {}
+    ParseResult parse(const char*& p, const char* end) override; 
+    std::unique_ptr<Value> value() const;
+
+
+private:
+    enum class Status {begin, true_val, false_val, null_val, number, string, object, array};
+    Status status_;
+    static const std::string null_val;
+    static const std::string true_val;
+    static const std::string false_val;
+    LiteralParser null_parser_;
+    LiteralParser true_parser_;
+    LiteralParser false_parser_;
+    NumberParser number_parser_;
+    StringParser string_parser_;
+
+    bool bvalue_;
+    int integer_;
+    int frac_;
+    int exp_;
+    std::string string_;
+
+    ValueType type_;
+
 };
 
 

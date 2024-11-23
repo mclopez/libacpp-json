@@ -62,7 +62,7 @@ public:
 //    void current_key(std::string& ck) override { current_key_ = ck;}//TODO: needed???
 
     void string_value(std::string& key, std::string& value) override {
-        std::cout << "JsonVisitor::string_value: ";
+        //std::cout << "JsonVisitor::string_value: ";
         for (int i=0; i<indent_;++i )
             std::cout << '\t';
         std::cout << key << " : " << value << "\n"; 
@@ -469,6 +469,15 @@ namespace libacpp::json {
 		}
 */
 
+std::string to_string(ParseResult r) {
+    switch (r) {
+        case ParseResult::ok: return "ok";
+        case ParseResult::partial: return "partial";
+        case ParseResult::error: return "error";
+        default: return "Unknown";
+    }
+}
+
 std::vector<uint8_t> unicode_to_tf8(uint32_t codepoint) {
     std::vector<uint8_t> utf8;
 
@@ -516,6 +525,7 @@ bool is_hex(uint8_t c, uint8_t& r) {
 
 ParseResult StringParser::parse(const char*& p, const char* end) {
     while(p != end) {
+        //std::cout << "StringParser::parse *p: " << *p << " " << (long int)p << std::endl;
         switch(status_) {
             uint8_t v;
             case Status::begin:
@@ -583,8 +593,9 @@ ParseResult StringParser::parse(const char*& p, const char* end) {
 }
 
 
-ParseResult IntegerParser::parse(const char*& p, const char* end) {
+ParseResult NumberParser::parse(const char*& p, const char* end) {
     while(p != end) {
+        //std::cout << "NumberParser::parse *p: " << *p << std::endl;
         switch(status_) {
             case Status::begin:
                 result_ = 0;
@@ -603,7 +614,10 @@ ParseResult IntegerParser::parse(const char*& p, const char* end) {
                 } else if ( '1' <= *p && *p <= '9') {
                     result_ = *p - '0';
                     status_ = Status::integer;
+                } else {
+                    return ParseResult::error;
                 }
+
                 break;
             case Status::integer:
                 if ( '0' <= *p && *p <= '9') {
@@ -660,6 +674,142 @@ ParseResult IntegerParser::parse(const char*& p, const char* end) {
         ++p;
     }
     return ParseResult::partial;
+}
+
+
+ParseResult LiteralParser::parse(const char*& p, const char* end) {
+    while(p != end) {
+        //std::cout << "LiteralParser::parse " << literal_ << " " << *p << std::endl;
+        if (*p != literal_[pos_]) {
+            //std::cout << "LiteralParser::parse " << literal_ << " error" << std::endl;
+            return ParseResult::error;
+        }
+        if(pos_ == literal_.size()-1){
+            ++p;
+            //std::cout << "LiteralParser::parse "<< literal_ << " ok" << std::endl;
+            return ParseResult::ok;
+        }
+        ++pos_;
+        ++p;
+    }
+    return ParseResult::partial;
+}
+
+
+const std::string ValueParser::null_val = "null";
+const std::string ValueParser::true_val = "true";
+const std::string ValueParser::false_val = "false";
+
+ParseResult ValueParser::parse(const char*& p, const char* end) {
+    //std::cout <<"ValueParser::parse \n";
+
+    ParseResult r = ParseResult::partial;
+    while(p != end) {
+        //std::cout << *p << std::endl;
+        switch(status_) {
+            case Status::begin:
+                //null
+                status_ = Status::null_val;
+                type_ = ValueType::nil;
+                r = null_parser_.parse(p, end);
+                //true
+                if (r == ParseResult::error) {
+                    status_ = Status::true_val;
+                    type_ = ValueType::boolean;
+                    r = true_parser_.parse(p, end);
+                    if (r == ParseResult::ok){
+                        bvalue_ = true;
+                    } 
+                }
+                //false
+                if (r == ParseResult::error) {
+                    status_ = Status::false_val;
+                    type_ = ValueType::boolean;
+                    r = false_parser_.parse(p, end);
+                    if (r == ParseResult::ok){
+                        bvalue_ = false;
+                    } 
+                }
+                //number
+                if (r == ParseResult::error) {
+                    status_ = Status::number;
+                    type_ = ValueType::number;
+                    r = number_parser_.parse(p, end);
+                }
+                //string
+                if (r == ParseResult::error) {
+                    status_ = Status::string;
+                    type_ = ValueType::string;
+                    r = string_parser_.parse(p, end);
+                }
+
+                //std::cout <<"ValueParser::parse r= " << to_string(r) << " " << (int)status_ <<" " << (int)type_ << std::endl;
+                if (r == ParseResult::error){
+                    //parse object and value
+                    //std::cout <<"ERROR ************" << std::endl;
+                    return r;
+                } 
+                break;
+            case Status::true_val:
+                //std::cout <<"true_parser_.parse" << std::endl;
+                r = true_parser_.parse(p, end);
+                if (r == ParseResult::ok) {
+                    type_ = ValueType::boolean;
+                    bvalue_ = true;
+                }
+                break;
+            case Status::false_val: 
+                r = false_parser_.parse(p, end);
+                if (r == ParseResult::ok) {
+                    type_ = ValueType::boolean;
+                    bvalue_ = false;
+                }
+                break;
+            case Status::null_val:
+                r = null_parser_.parse(p, end);
+                if (r == ParseResult::ok) {
+                    type_ = ValueType::nil;
+                }
+                break;
+            case Status::number:
+                r = number_parser_.parse(p, end);
+                if (r == ParseResult::ok) {
+                    type_ = ValueType::number;
+                }
+                break;
+            case Status::string:
+                //std::cout <<"string_parser_.parse" << std::endl;
+                r = string_parser_.parse(p, end);
+                if (r == ParseResult::ok) {
+                    type_ = ValueType::string;
+                }
+                break;
+            case Status::object: 
+                break;
+            case Status::array:
+                break;
+            default:
+                break;
+        }
+        if (r==ParseResult::error || r ==ParseResult::ok)
+            return r;
+        //++p;
+    }
+    return r;
+}
+
+std::unique_ptr<Value> ValueParser::value() const {
+    switch (type_)
+    {
+    case ValueType::nil:
+        return std::make_unique<NullValue>();
+        break;
+    case ValueType::boolean:
+        return std::make_unique<BoolValue>(bvalue_);
+    default:
+        break;
+    }
+    return std::unique_ptr<Value>(); 
 }
 
 
