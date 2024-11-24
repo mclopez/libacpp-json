@@ -525,7 +525,7 @@ bool is_hex(uint8_t c, uint8_t& r) {
 
 ParseResult StringParser::parse(const char*& p, const char* end) {
     while(p != end) {
-        //std::cout << "StringParser::parse *p: " << *p << " " << (long int)p << std::endl;
+        std::cout << "StringParser::parse *p: " << *p << " " << (long int)p << std::endl;
         switch(status_) {
             uint8_t v;
             case Status::begin:
@@ -586,7 +586,7 @@ ParseResult StringParser::parse(const char*& p, const char* end) {
             default:
                 break;
         }
-        //std::cout << result_ << std::endl;
+        std::cout << result_ << std::endl;
         ++p;
     }
     return ParseResult::partial;
@@ -595,7 +595,7 @@ ParseResult StringParser::parse(const char*& p, const char* end) {
 
 ParseResult NumberParser::parse(const char*& p, const char* end) {
     while(p != end) {
-        //std::cout << "NumberParser::parse *p: " << *p << std::endl;
+        std::cout << "NumberParser::parse *p: " << *p << std::endl;
         switch(status_) {
             case Status::begin:
                 result_ = 0;
@@ -626,7 +626,10 @@ ParseResult NumberParser::parse(const char*& p, const char* end) {
                         status_ = Status::frac;    
                 }else if (*p == 'e' || *p == 'E') {
                     status_ = Status::exp;
+                } else {
+                    return ParseResult::ok;
                 }
+
                 break;
             case Status::frac:
                 if ( '0' <= *p && *p <= '9') {
@@ -649,23 +652,30 @@ ParseResult NumberParser::parse(const char*& p, const char* end) {
                 sign_ = +1;
                 if ( *p == '-') {
                     sign_ = -1;
-                    status_ = Status::exp2;
+                    status_ = Status::exp_first_digit;
                 } else if ( *p == '+') {
                     sign_ = +1;
-                    status_ = Status::exp2;
+                    status_ = Status::exp_first_digit;
                 } else if ( '0' <= *p && *p <= '9') {
                     exp_ = (exp_ * 10) + sign_ * (*p - '0');
-                    status_ = Status::exp2;
+                    status_ = Status::exp_digits;
                 } else {
                     return ParseResult::error;
                 }
                 break;
-            case Status::exp2:
+            case Status::exp_first_digit:
                 if ( '0' <= *p && *p <= '9') {
                     exp_ = (exp_ * 10) + sign_ * (*p - '0');
-                    //status_ = Status::exp2;
+                    status_ = Status::exp_digits;
                 } else {
                     return ParseResult::error;
+                }
+                break;
+            case Status::exp_digits:
+                if ( '0' <= *p && *p <= '9') {
+                    exp_ = (exp_ * 10) + sign_ * (*p - '0');
+                } else {
+                    return ParseResult::ok;
                 }
                 break;
             default:
@@ -701,11 +711,11 @@ const std::string ValueParser::true_val = "true";
 const std::string ValueParser::false_val = "false";
 
 ParseResult ValueParser::parse(const char*& p, const char* end) {
-    //std::cout <<"ValueParser::parse \n";
+    std::cout <<"ValueParser::parse \n";
 
     ParseResult r = ParseResult::partial;
-    while(p != end) {
-        //std::cout << *p << std::endl;
+    while(p < end && r != ParseResult::ok) {
+        std::cout << *p << " " << (long int)p  << " r: " << (int)r << " status_: " << (int)status_ << std::endl;
         switch(status_) {
             case Status::begin:
                 //null
@@ -746,7 +756,7 @@ ParseResult ValueParser::parse(const char*& p, const char* end) {
                 //std::cout <<"ValueParser::parse r= " << to_string(r) << " " << (int)status_ <<" " << (int)type_ << std::endl;
                 if (r == ParseResult::error){
                     //parse object and value
-                    //std::cout <<"ERROR ************" << std::endl;
+                    std::cout <<"ERROR ************" << std::endl;
                     return r;
                 } 
                 break;
@@ -778,7 +788,7 @@ ParseResult ValueParser::parse(const char*& p, const char* end) {
                 }
                 break;
             case Status::string:
-                //std::cout <<"string_parser_.parse" << std::endl;
+                std::cout <<"string_parser_.parse p:" << (long int) p  << " e: "<< (long int) end << std::endl;
                 r = string_parser_.parse(p, end);
                 if (r == ParseResult::ok) {
                     type_ = ValueType::string;
@@ -791,9 +801,28 @@ ParseResult ValueParser::parse(const char*& p, const char* end) {
             default:
                 break;
         }
-        if (r==ParseResult::error || r ==ParseResult::ok)
+        if (r==ParseResult::error)
             return r;
         //++p;
+    }
+    if (r ==ParseResult::ok) {
+        switch (type_)
+        {
+        case ValueType::nil:
+            visitor_.null_value();
+            break;
+        case ValueType::boolean:
+            visitor_.bool_value(bvalue_);
+            break;
+        case ValueType::string:
+            visitor_.string_value(string_);
+            break;
+        case ValueType::number:
+            visitor_.numbrer_value(integer_, frac_, exp_);
+            break;
+        default:
+            break;
+        }
     }
     return r;
 }
@@ -810,6 +839,65 @@ std::unique_ptr<Value> ValueParser::value() const {
         break;
     }
     return std::unique_ptr<Value>(); 
+}
+
+ParseResult KeyValueParser::parse(const char*& p, const char* end)  {
+    while(p != end) {
+        std::cout << "KeyValueParser::parse *p:" << *p << " status_: " << (int)status_ << std::endl;
+        ParseResult result = ParseResult::partial;
+        switch(status_) {
+            case Status::ws1:
+                result = wsp_.parse(p, end);
+                if ( result == ParseResult::ok){
+                    status_ = Status::key;
+                }
+                break;
+            case Status::key:
+                result = kp_.parse(p, end);
+                if ( result == ParseResult::ok){
+                    status_ = Status::ws2;
+                }
+                break;
+            case Status::ws2:
+                std::cout << "KeyValueParser::parse ws2 *p:"  << *p << std::endl; 
+                result = wsp_.parse(p, end);
+                if (result == ParseResult::ok)
+                    status_ = Status::sep;
+                break;
+            case Status::sep:
+                std::cout << " sep *p:"  << *p << std::endl; 
+                if (*p == ':') {
+                    // we have separator, key is ok
+                    visitor_.key(key_);
+                    status_ = Status::ws3;
+                    ++p;
+                }
+                else 
+                    return ParseResult::error;    
+                break;
+            case Status::ws3:
+                result = wsp_.parse(p, end);
+                if (result == ParseResult::ok)
+                    status_ = Status::value;
+                break;
+            case Status::value:
+                result = vp_.parse(p, end);
+                if (result == ParseResult::ok) {
+                    status_ = Status::ws1;
+                    //vp_.reset();
+                    return result;
+                }
+                break;
+            default:
+                break;
+        }
+        if (result == ParseResult::error) {
+            std::cout << "KeyValueParser::parse error" << std::endl; 
+            return result;    
+        }
+        //++p;
+    }
+    return ParseResult::partial;
 }
 
 

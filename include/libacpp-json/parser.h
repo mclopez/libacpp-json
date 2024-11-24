@@ -23,9 +23,17 @@ public:
     Value(ValueType type):type_(type){}
     ValueType type() {return type_;}
     virtual std::string to_string()=0;
-private:
+//    bool operator ==(const Value& v) {return type_ == v.type_};
+protected:
     ValueType type_; 
 };
+
+// templat<typename V1. typename V2>
+// bool operator ==(const Value& v1, const Value& v2) {
+//     return type_ == v.type_
+
+// };
+
 
 class NullValue: public Value {
 public:
@@ -72,10 +80,14 @@ public:
 class JsonVisitorBase {
 public:
 
-    virtual std::string& current_key() =0;
+//    virtual std::string& current_key() =0;
 //    virtual void current_key(std::string&) =0;
 
-    virtual void string_value(std::string& key, std::string& value) =0;
+    virtual void key(std::string&) =0;
+    virtual void null_value() =0;
+    virtual void string_value(std::string& value) =0;
+    virtual void bool_value(bool value) =0;
+    virtual void numbrer_value(int integer, int frac, int exp) =0;
     virtual void begin_object() =0;
     virtual void end_object() =0;
 
@@ -139,7 +151,7 @@ public:
     NumberParser(int& result, int& frac, int& exp):result_(result), frac_(frac), exp_(exp), status_(Status::begin), sign_(1){}
     ParseResult parse(const char*& p, const char* end) override; 
 private:
-    enum class Status {begin, integer, frac, frac2, exp, exp_sign, exp_val1, exp2};
+    enum class Status {begin, integer, frac, frac2, exp, exp_first_digit, exp_digits};
     Status status_;
     int& result_;
     int sign_;
@@ -159,10 +171,10 @@ private:
 
 class ValueParser: public JsonParser {
 public:
-    ValueParser()
+    ValueParser(JsonVisitorBase& v)
     :status_(Status::begin),
     null_parser_(null_val),true_parser_(true_val), false_parser_(false_val),
-    number_parser_(integer_, frac_, exp_), string_parser_(string_), type_(ValueType::undef)
+    number_parser_(integer_, frac_, exp_), string_parser_(string_), type_(ValueType::undef), visitor_(v)
     {}
     ParseResult parse(const char*& p, const char* end) override; 
     std::unique_ptr<Value> value() const;
@@ -187,8 +199,42 @@ private:
     std::string string_;
 
     ValueType type_;
-
+    JsonVisitorBase& visitor_;
 };
+
+
+class WhiteSpaceParser: public JsonParser {
+public:
+    WhiteSpaceParser() = default;
+
+    ParseResult parse(const char*& p, const char* end)  {
+        while ((*p == ' ' || *p == '\t' ||*p == '\n' ||*p == '\r') && p != end)
+            ++p;
+        return ParseResult::ok;
+    }
+
+private:
+};
+
+
+class KeyValueParser: public JsonParser {
+public:
+    KeyValueParser(JsonVisitorBase& v)
+    : status_(Status::ws1), kp_(key_), visitor_(v), vp_(v) {
+
+    }
+    ParseResult parse(const char*& p, const char* end);
+
+private:
+    enum class Status {ws1, key, ws2, sep, ws3, value};
+    Status status_;
+    std::string key_;
+    WhiteSpaceParser wsp_;
+    StringParser kp_;
+    ValueParser vp_;
+    JsonVisitorBase& visitor_;
+};
+
 
 
 }// namespace libacpp::json
