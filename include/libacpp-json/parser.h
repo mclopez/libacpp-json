@@ -137,6 +137,7 @@ class StringParser: public JsonParser {
 public:
     StringParser(std::string& result):result_(result), status_(Status::begin), uniCount_(0), unicode_(1) {}
     ParseResult parse(const char*& p, const char* end) override; 
+    void reset() { status_ = Status::begin;}
 
 private:
     enum class Status {begin, middle, escape, unicode, uni4end};
@@ -150,6 +151,7 @@ class NumberParser: public JsonParser {
 public:
     NumberParser(int& result, int& frac, int& exp):result_(result), frac_(frac), exp_(exp), status_(Status::begin), sign_(1){}
     ParseResult parse(const char*& p, const char* end) override; 
+    void reset() { status_ = Status::begin;}
 private:
     enum class Status {begin, integer, frac, frac2, exp, exp_first_digit, exp_digits};
     Status status_;
@@ -164,10 +166,14 @@ public:
     LiteralParser(const std::string& literal):pos_(0), literal_(literal){}
     ParseResult parse(const char*& p, const char* end) override; 
 
+    void reset() { pos_=0;}
+
 private:
     size_t pos_;
     const std::string& literal_;
 };
+
+class ObjectParser;
 
 class ValueParser: public JsonParser {
 public:
@@ -179,18 +185,20 @@ public:
     ParseResult parse(const char*& p, const char* end) override; 
     std::unique_ptr<Value> value() const;
 
-    void reset() {status_ = Status::begin;}
+    void reset();
 private:
     enum class Status {begin, true_val, false_val, null_val, number, string, object, array};
     Status status_;
     static const std::string null_val;
     static const std::string true_val;
     static const std::string false_val;
+
     LiteralParser null_parser_;
     LiteralParser true_parser_;
     LiteralParser false_parser_;
     NumberParser number_parser_;
     StringParser string_parser_;
+    std::unique_ptr<ObjectParser> object_parser_;
 
     bool bvalue_;
     int integer_;
@@ -208,12 +216,18 @@ public:
     WhiteSpaceParser() = default;
 
     ParseResult parse(const char*& p, const char* end)  {
-        while ((*p == ' ' || *p == '\t' ||*p == '\n' ||*p == '\r') && p != end)
+        while (p != end) {
+            if (!is_ws(*p)) 
+                return ParseResult::ok;
             ++p;
-        return ParseResult::ok;
+        }
+        return ParseResult::partial;
     }
 
 private:
+    bool is_ws(char c) {
+        return ( c == ' ' || c == '\t' || c == '\n' || c == '\r');
+    }
 };
 
 
@@ -225,8 +239,10 @@ public:
     }
     ParseResult parse(const char*& p, const char* end);
     void reset() {
-        //status_ = Status::ws1;
+        key_ = "";
+        status_ = Status::ws1;
         vp_.reset();
+
     }
 private:
     enum class Status {ws1, key, ws2, sep, ws3, value};
@@ -240,10 +256,9 @@ private:
 
 class ObjectParser: public JsonParser {
 public:
-    ObjectParser(JsonVisitorBase& visitor):visitor_(visitor), kvp_(visitor), status_(Status::begin) {}
-
+    ObjectParser(JsonVisitorBase& visitor);
     ParseResult parse(const char*& p, const char* end) override;
-
+    void reset();
 private:
     enum class Status {begin, key_value, ws1, sep, ws2};
     Status status_;

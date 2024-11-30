@@ -113,7 +113,9 @@ tests[]{
     {"1E- ", ParseResult::error, 1, 0, 0}, 
     {"123.45e67", ParseResult::partial, 123, 45, 67}, 
     {"123.45e6a7", ParseResult::ok, 123, 45, 6}, 
-    {"123.45ea", ParseResult::error, 123, 45, 0}, 
+    {"123.45", ParseResult::partial, 123, 45, 0}, 
+    {"123.45 ", ParseResult::ok, 123, 45, 0}, 
+    {"123.45ea", ParseResult::error, 123, 45, 0}, // a letter after exp 'e'
     {"-123.45e67", ParseResult::partial, -123, 45, 67}, 
     {"123.45e-67", ParseResult::partial, 123, 45, -67}, 
     {"-123.45e-67", ParseResult::partial, -123, 45, -67}, 
@@ -253,6 +255,7 @@ TEST(ParserTests, Value)
         JSON_LOG_DEBUG("testing input: {} **********************", t.input);
         std::string result;
         JsonVisitor jv;
+        ObjectParser op(jv);
         ValueParser sp(jv);
         const char* p = t.input.data();
         auto r = sp.parse(p, p + t.input.size());
@@ -268,6 +271,7 @@ TEST(ParserTests, Value)
         ++c;
         std::string result;
         JsonVisitor jv;
+        ObjectParser op(jv);
         ValueParser sp(jv);
         const char* p = t.input.data();
         const char* end = p + t.input.size();
@@ -319,6 +323,7 @@ TEST(ParserTests, KeyValue)
     for(const auto& t: tests) {
         JSON_LOG_DEBUG("testing {}", t.input);
         JsonVisitor v;
+        ObjectParser op(v);
         KeyValueParser sp(v);
         const char* p = t.input.data();
         auto r = sp.parse(p, p + t.input.size());
@@ -335,6 +340,7 @@ TEST(ParserTests, KeyValue)
         JSON_LOG_DEBUG("testing {}", t.input);
         ++c;
         JsonVisitor v;
+        ObjectParser op(v);
         KeyValueParser sp(v);
         const char* p = t.input.data();
         const char* end = p + t.input.size();
@@ -367,9 +373,29 @@ TEST(ParserTests, Object)
             "\t(BOL)key2/1\n"
         }, 
 
+        {R"({"key1":{"key2":2}})", ParseResult::ok, 
+                "(OBJ)\n" 
+                "\t(OBJ)key1\n"
+                "\t\t(NUM)key2/2/0/0\n"
+        }, 
+        {R"({"key1":{"key2":"abcd", "key3":1.234,"key4":{"key5": null, "key6": false}}})", ParseResult::ok, 
+                "(OBJ)\n" 
+                "\t(OBJ)key1\n"
+                "\t\t(STR)key2/abcd\n"
+                "\t\t(NUM)key3/1/234/0\n"
+                "\t\t(OBJ)key4\n"
+                "\t\t\t(NULL)key5\n"
+                "\t\t\t(BOL)key6/0\n"
+        }, 
+        {R"({"key1":{"key2":1}})", ParseResult::ok, 
+                "(OBJ)\n" 
+                "\t(OBJ)key1\n"
+                "\t\t(NUM)key2/1/0/0\n"
+        }, 
+
 
     };
-    //if (false)
+    if (false)
     {
         JSON_LOG_DEBUG("first test");
         for(const auto& t: tests) {
@@ -385,7 +411,7 @@ TEST(ParserTests, Object)
             
         }
     }
-    if (false)
+    if (true)
     {
         JSON_LOG_DEBUG("second test");
         int c =0;
@@ -393,12 +419,12 @@ TEST(ParserTests, Object)
             JSON_LOG_DEBUG("testing {}", t.input);
             ++c;
             JsonVisitor v;
-            KeyValueParser sp(v);
+            ObjectParser op(v);
             const char* p = t.input.data();
             const char* end = p + t.input.size();
             ParseResult r = ParseResult::partial;
             while (p != end && r == ParseResult::partial) {
-                r = sp.parse(p, p+1);
+                r = op.parse(p, p+1);
             }
             EXPECT_EQ(r, t.parseResult);
             JSON_LOG_DEBUG("result {}", v.to_string());

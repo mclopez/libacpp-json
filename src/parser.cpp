@@ -595,7 +595,7 @@ ParseResult StringParser::parse(const char*& p, const char* end) {
 
 ParseResult NumberParser::parse(const char*& p, const char* end) {
     while(p != end) {
-        std::cout << "NumberParser::parse *p: " << *p << std::endl;
+        std::cout << "NumberParser::parse *p: " << *p << " status_: " << (int)status_ << std::endl;
         switch(status_) {
             case Status::begin:
                 result_ = 0;
@@ -645,7 +645,7 @@ ParseResult NumberParser::parse(const char*& p, const char* end) {
                 }else if (*p == 'e' || *p == 'E') {
                     status_ = Status::exp;
                 } else {
-                    return ParseResult::error;
+                    return ParseResult::ok;
                 }
                 break;
             case Status::exp:
@@ -710,12 +710,25 @@ const std::string ValueParser::null_val = "null";
 const std::string ValueParser::true_val = "true";
 const std::string ValueParser::false_val = "false";
 
+void ValueParser::reset() {
+    status_ = Status::begin;
+    if (object_parser_)
+        object_parser_->reset();
+    null_parser_.reset();
+    true_parser_.reset();
+    false_parser_.reset();
+    number_parser_.reset();
+    string_parser_.reset();
+
+}
+
+
 ParseResult ValueParser::parse(const char*& p, const char* end) {
-    std::cout <<"ValueParser::parse \n";
+    //std::cout <<"ValueParser::parse \n";
 
     ParseResult r = ParseResult::partial;
     while(p < end && r != ParseResult::ok) {
-        std::cout << *p << " " << (long int)p  << " r: " << (int)r << " status_: " << (int)status_ << std::endl;
+        std::cout << "ValueParser::parse " << *p << " " << (long int)p  << " r: " << (int)r << " status_: " << (int)status_ << std::endl;
         switch(status_) {
             case Status::begin:
                 //null
@@ -745,12 +758,24 @@ ParseResult ValueParser::parse(const char*& p, const char* end) {
                     status_ = Status::number;
                     type_ = ValueType::number;
                     r = number_parser_.parse(p, end);
+                    std::cout <<"ValueParser::parse number ************ r:" << (int)r << std::endl;
+
                 }
                 //string
                 if (r == ParseResult::error) {
                     status_ = Status::string;
                     type_ = ValueType::string;
                     r = string_parser_.parse(p, end);
+                }
+                //object
+                if (r == ParseResult::error) {
+                    status_ = Status::object;
+                    type_ = ValueType::object;
+                    //TODO: check this. Reset instead??
+                    //if (!object_parser_)
+                    object_parser_.release();
+                        object_parser_ = std::make_unique<ObjectParser>(visitor_);
+                    r = object_parser_->parse(p, end);
                 }
 
                 //std::cout <<"ValueParser::parse r= " << to_string(r) << " " << (int)status_ <<" " << (int)type_ << std::endl;
@@ -794,7 +819,12 @@ ParseResult ValueParser::parse(const char*& p, const char* end) {
                     type_ = ValueType::string;
                 }
                 break;
-            case Status::object: 
+            case Status::object:
+                //std::cout <<"object_parser_.parse p:" << (long int) p  << " e: "<< (long int) end << std::endl;
+                r = object_parser_->parse(p, end);
+                if (r == ParseResult::ok) {
+                    type_ = ValueType::object;
+                }
                 break;
             case Status::array:
                 break;
@@ -809,6 +839,7 @@ ParseResult ValueParser::parse(const char*& p, const char* end) {
         switch (type_)
         {
         case ValueType::nil:
+            std::cout << "visitor_.null_value();" << std::endl;
             visitor_.null_value();
             break;
         case ValueType::boolean:
@@ -843,7 +874,7 @@ std::unique_ptr<Value> ValueParser::value() const {
 
 ParseResult KeyValueParser::parse(const char*& p, const char* end)  {
     while(p != end) {
-        std::cout << "KeyValueParser::parse *p:" << *p << " status_: " << (int)status_ << std::endl;
+        std::cout << "KeyValueParser::parse *p: " << *p << " status_: " << (int)status_ << std::endl;
         ParseResult result = ParseResult::partial;
         switch(status_) {
             case Status::ws1:
@@ -865,7 +896,7 @@ ParseResult KeyValueParser::parse(const char*& p, const char* end)  {
                     status_ = Status::sep;
                 break;
             case Status::sep:
-                std::cout << " sep *p:"  << *p << std::endl; 
+                std::cout << "KeyValueParser::parse sep *p:"  << *p << std::endl; 
                 if (*p == ':') {
                     // we have separator, key is ok
                     visitor_.key(key_);
@@ -877,8 +908,10 @@ ParseResult KeyValueParser::parse(const char*& p, const char* end)  {
                 break;
             case Status::ws3:
                 result = wsp_.parse(p, end);
-                if (result == ParseResult::ok)
+                if (result == ParseResult::ok) {
+                    vp_.reset();
                     status_ = Status::value;
+                }
                 break;
             case Status::value:
                 result = vp_.parse(p, end);
@@ -900,11 +933,21 @@ ParseResult KeyValueParser::parse(const char*& p, const char* end)  {
     return ParseResult::partial;
 }
 
+void ObjectParser::reset() {
+    status_ = Status::begin;
+}
+
+ObjectParser::ObjectParser(JsonVisitorBase& visitor)
+:visitor_(visitor), kvp_(visitor), status_(Status::begin) {
+    std::cout << "ObjectParser::ObjectParser  NEW"  << std::endl;
+}
+
 
 ParseResult ObjectParser::parse(const char*& p, const char* end) {
+    std::cout << "ObjectParser::parse"  << std::endl;
     ParseResult result = ParseResult::partial;
     while(p != end) {
-        std::cout << "(op)*p:" << *p  << " status: " << (int)status_ << std::endl;
+        std::cout << "ObjectParser::parse *p: " << *p  << " status: " << (int)status_ << std::endl;
         switch(status_) {
             case Status::begin:
                 if (*p != '{') {
