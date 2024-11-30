@@ -179,7 +179,7 @@ public:
     ParseResult parse(const char*& p, const char* end) override; 
     std::unique_ptr<Value> value() const;
 
-
+    void reset() {status_ = Status::begin;}
 private:
     enum class Status {begin, true_val, false_val, null_val, number, string, object, array};
     Status status_;
@@ -224,7 +224,10 @@ public:
 
     }
     ParseResult parse(const char*& p, const char* end);
-
+    void reset() {
+        //status_ = Status::ws1;
+        vp_.reset();
+    }
 private:
     enum class Status {ws1, key, ws2, sep, ws3, value};
     Status status_;
@@ -233,6 +236,20 @@ private:
     StringParser kp_;
     ValueParser vp_;
     JsonVisitorBase& visitor_;
+};
+
+class ObjectParser: public JsonParser {
+public:
+    ObjectParser(JsonVisitorBase& visitor):visitor_(visitor), kvp_(visitor), status_(Status::begin) {}
+
+    ParseResult parse(const char*& p, const char* end) override;
+
+private:
+    enum class Status {begin, key_value, ws1, sep, ws2};
+    Status status_;
+    JsonVisitorBase& visitor_;
+    KeyValueParser kvp_;
+    WhiteSpaceParser wsp_;
 };
 
 

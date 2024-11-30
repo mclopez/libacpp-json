@@ -208,6 +208,9 @@ void numbrer_value(int integer, int frac, int exp)  override {
 }
 
 void begin_object()  override {
+    for (int i=0; i<indent_; i++)
+        result_ << "\t";
+    result_ << "(OBJ)" << key_ << '\n';
     ++ indent_;
 }
 
@@ -295,14 +298,18 @@ TEST(ParserTests, KeyValue)
     } 
     tests[]{
         {R"("key2":x )", ParseResult::error, ""}, 
+        {R"("key2":12.345eaa7 )", ParseResult::error, ""}, 
+        {R"("key2":Null )", ParseResult::error, ""}, 
+        {R"("key2":False )", ParseResult::error, ""}, 
+        {R"("key2":truE )", ParseResult::error, ""}, 
+
         {R"("key1":"value1")", ParseResult::ok, "(STR)key1/value1\n"}, 
         {R"("key2":12345 )", ParseResult::ok, "(NUM)key2/12345/0/0\n"}, 
         {R"("key2":12.345e67 )", ParseResult::ok, "(NUM)key2/12/345/67\n"}, 
         {R"("key2":12.345e6a7 )", ParseResult::ok, "(NUM)key2/12/345/6\n"}, 
-        {R"("key2":12.345eaa7 )", ParseResult::error, ""}, 
-        {R"("key3":true )", ParseResult::ok, "(BOL)key3/1\n"}, 
+        {R"("key3":true )",  ParseResult::ok, "(BOL)key3/1\n"}, 
         {R"("key4":false )", ParseResult::ok, "(BOL)key4/0\n"}, 
-        {R"("key5":null )", ParseResult::ok, "(NULL)key5\n"}, 
+        {R"("key5":null )",  ParseResult::ok, "(NULL)key5\n"}, 
 
 
     };
@@ -339,5 +346,64 @@ TEST(ParserTests, KeyValue)
         JSON_LOG_DEBUG("result {}", v.to_string());
         EXPECT_EQ(v.to_string(), t.result);
    }
+
+}
+
+
+TEST(ParserTests, Object)
+{
+    struct Test {
+        std::string input;
+        ParseResult parseResult;
+        std::string result;
+    } 
+    tests[]{
+        {R"({"key1":null})", ParseResult::ok, "(OBJ)\n\t(NULL)key1\n"}, 
+        {R"({ "key1" : null })", ParseResult::ok, "(OBJ)\n\t(NULL)key1\n"}, 
+        {R"({   "key1"  :   null    })", ParseResult::ok, "(OBJ)\n\t(NULL)key1\n"}, 
+        {R"({ "key1" : null , "key2" : true })", ParseResult::ok, 
+            "(OBJ)\n" 
+            "\t(NULL)key1\n"
+            "\t(BOL)key2/1\n"
+        }, 
+
+
+    };
+    //if (false)
+    {
+        JSON_LOG_DEBUG("first test");
+        for(const auto& t: tests) {
+            JSON_LOG_DEBUG("testing {}", t.input);
+            JsonVisitor v;
+            ObjectParser sp(v);
+            const char* p = t.input.data();
+            auto r = sp.parse(p, p + t.input.size());
+
+            EXPECT_EQ(r, t.parseResult);
+            JSON_LOG_DEBUG("result {}", v.to_string());
+            EXPECT_EQ(v.to_string(), t.result);
+            
+        }
+    }
+    if (false)
+    {
+        JSON_LOG_DEBUG("second test");
+        int c =0;
+        for(const auto& t: tests) {
+            JSON_LOG_DEBUG("testing {}", t.input);
+            ++c;
+            JsonVisitor v;
+            KeyValueParser sp(v);
+            const char* p = t.input.data();
+            const char* end = p + t.input.size();
+            ParseResult r = ParseResult::partial;
+            while (p != end && r == ParseResult::partial) {
+                r = sp.parse(p, p+1);
+            }
+            EXPECT_EQ(r, t.parseResult);
+            JSON_LOG_DEBUG("result {}", v.to_string());
+            EXPECT_EQ(v.to_string(), t.result);
+        }
+    }
 
 }

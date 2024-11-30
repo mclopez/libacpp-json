@@ -901,4 +901,62 @@ ParseResult KeyValueParser::parse(const char*& p, const char* end)  {
 }
 
 
+ParseResult ObjectParser::parse(const char*& p, const char* end) {
+    ParseResult result = ParseResult::partial;
+    while(p != end) {
+        std::cout << "(op)*p:" << *p  << " status: " << (int)status_ << std::endl;
+        switch(status_) {
+            case Status::begin:
+                if (*p != '{') {
+                    return ParseResult::error;
+                }
+                ++p;
+                visitor_.begin_object();
+                status_ = Status::key_value;
+                break;
+            case Status::key_value:
+                if (kvp_.parse(p, end) == ParseResult::ok) {
+                    if (*p == '}') {
+                        visitor_.end_object();
+                        status_ = Status::begin; 
+                        return ParseResult::ok;
+                    }
+                    status_ = Status::ws1;
+                }
+                break;
+            case Status::ws1:
+                if (wsp_.parse(p, end) == ParseResult::ok)
+                    status_ = Status::sep;
+                break;
+            case Status::sep:
+                //std::cout << "*p:"  << *p << std::endl; 
+                if (*p == ',') {
+                    status_ = Status::ws2;
+                    ++p;
+                } else if (*p == '}') {
+                    ++p;
+                    return ParseResult::ok;    
+                } else 
+                    return ParseResult::error;    
+                break;
+            case Status::ws2:
+
+                if (wsp_.parse(p, end) == ParseResult::ok) {
+                    if(*p == '}') {
+                        //std::cout << "*p:"  << *p << std::endl; 
+                        return ParseResult::ok;
+                    } else {
+                        kvp_.reset(); //TODO: needed?
+                        status_ = Status::key_value;
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    return result;
+}
+
+
 } // namespace libacpp::json
