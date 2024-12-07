@@ -12,6 +12,9 @@
 
 #include <libacpp-json/parser.h>
 
+#include "libacpp-json/log.h"
+
+
 //enum class ParseResult {ok, partial, error};
 
 /*
@@ -714,6 +717,8 @@ void ValueParser::reset() {
     status_ = Status::begin;
     if (object_parser_)
         object_parser_->reset();
+    if (array_parser_)
+        array_parser_->reset();
     null_parser_.reset();
     true_parser_.reset();
     false_parser_.reset();
@@ -774,8 +779,16 @@ ParseResult ValueParser::parse(const char*& p, const char* end) {
                     //TODO: check this. Reset instead??
                     //if (!object_parser_)
                     object_parser_.release();
-                        object_parser_ = std::make_unique<ObjectParser>(visitor_);
+                        object_parser_ = std::make_unique<ObjectParser>(visitor_);    
                     r = object_parser_->parse(p, end);
+                }
+                //array
+                if (r == ParseResult::error) {
+                    status_ = Status::object;
+                    type_ = ValueType::object;
+                    //array_parser_.release();
+                    array_parser_ = std::make_unique<ArrayParser>(visitor_);    
+                    r = array_parser_->parse(p, end);
                 }
 
                 //std::cout <<"ValueParser::parse r= " << to_string(r) << " " << (int)status_ <<" " << (int)type_ << std::endl;
@@ -948,6 +961,7 @@ ParseResult ObjectParser::parse(const char*& p, const char* end) {
     ParseResult result = ParseResult::partial;
     while(p != end) {
         std::cout << "ObjectParser::parse *p: " << *p  << " status: " << (int)status_ << std::endl;
+        ParseResult r;
         switch(status_) {
             case Status::begin:
                 if (*p != '{') {
@@ -955,15 +969,121 @@ ParseResult ObjectParser::parse(const char*& p, const char* end) {
                 }
                 ++p;
                 visitor_.begin_object();
-                status_ = Status::key_value;
+                status_ = Status::ws0;
+                break;
+            case Status::ws0:
+                r = wsp_.parse(p, end);
+                if ( r == ParseResult::ok) {
+                    if(*p == '}') {
+                        //std::cout << "*p:"  << *p << std::endl; 
+                        return ParseResult::ok;
+                    } else {
+                        kvp_.reset(); //TODO: needed?
+                        status_ = Status::key_value;
+                    }
+                } else if ( r == ParseResult::error) {
+                    return ParseResult::error;
+                }
                 break;
             case Status::key_value:
-                if (kvp_.parse(p, end) == ParseResult::ok) {
+                r = kvp_.parse(p, end);
+                if (r == ParseResult::ok) {
                     if (*p == '}') {
                         visitor_.end_object();
                         status_ = Status::begin; 
                         return ParseResult::ok;
                     }
+                    // if (*p == ']') {
+                    //     visitor_.end_array();
+                    //     status_ = Status::begin; 
+                    //     return ParseResult::ok;
+                    // }
+                    status_ = Status::ws1;
+                } else if (r == ParseResult::error){
+                    JSON_LOG_TRACE("ObjectParser::parse  ERROR **************");
+                    return ParseResult::error;
+                }
+                break;
+            case Status::ws1:
+                r = wsp_.parse(p, end);
+                if ( r == ParseResult::ok) {
+                    status_ = Status::sep;
+                    if (*p == '}') {
+                        visitor_.end_object();
+                        status_ = Status::begin; 
+                        JSON_LOG_TRACE("ObjectParser::parse  ERROR **************");
+                        return ParseResult::ok;
+                    }
+                }
+                else if (r==ParseResult::error)
+                    return ParseResult::error;    
+                break;
+            case Status::sep:
+                //std::cout << "*p:"  << *p << std::endl; 
+                if (*p == ',') {
+                    status_ = Status::ws2;
+                    ++p;
+                } else if (*p == '}') {
+                    ++p;
+                        JSON_LOG_TRACE("ObjectParser::parse  ERROR **************");
+                    return ParseResult::ok;    
+                } else 
+                    return ParseResult::error;    
+                break;
+            case Status::ws2:
+                r = wsp_.parse(p, end);
+                if ( r == ParseResult::ok) {
+                    if(*p == '}') {
+                        //std::cout << "*p:"  << *p << std::endl; 
+                        return ParseResult::ok;
+                    } else {
+                        kvp_.reset(); //TODO: needed?
+                        status_ = Status::key_value;
+                    }
+                } else if ( r == ParseResult::error) {
+                    return ParseResult::error;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    return result;
+}
+
+void ArrayParser::reset() {
+    status_ = Status::begin;
+}
+
+ArrayParser::ArrayParser(JsonVisitorBase& visitor)
+:visitor_(visitor), vp_(visitor), status_(Status::begin) {
+    std::cout << "ArrayParser::ArrayParser  NEW"  << std::endl;
+}
+
+ParseResult ArrayParser::parse(const char*& p, const char* end) {
+    std::cout << "ArrayParser::parse"  << std::endl;
+    ParseResult result = ParseResult::partial;
+    while(p != end) {
+        std::cout << "ArrayParser::parse *p: " << *p  << " status: " << (int)status_ << std::endl;
+        switch(status_) {
+            case Status::begin:
+                if (*p != '[') {
+                    return ParseResult::error;
+                }
+                ++p;
+                visitor_.begin_array();
+                status_ = Status::value;
+                break;
+            case Status::value:
+                if (vp_.parse(p, end) == ParseResult::ok) {
+                    if (*p == ']') {
+                        ++p;
+                        std::cout << "ArrayParser::parse ws1 *********** end" << std::endl;
+                        visitor_.end_array();
+                        status_ = Status::begin; 
+                        return ParseResult::ok;
+                    }
+                    std::cout << "ArrayParser::parse ws1 *********** " << std::endl;
                     status_ = Status::ws1;
                 }
                 break;
@@ -976,7 +1096,7 @@ ParseResult ObjectParser::parse(const char*& p, const char* end) {
                 if (*p == ',') {
                     status_ = Status::ws2;
                     ++p;
-                } else if (*p == '}') {
+                } else if (*p == ']') {
                     ++p;
                     return ParseResult::ok;    
                 } else 
@@ -985,12 +1105,12 @@ ParseResult ObjectParser::parse(const char*& p, const char* end) {
             case Status::ws2:
 
                 if (wsp_.parse(p, end) == ParseResult::ok) {
-                    if(*p == '}') {
+                    if(*p == ']') {
                         //std::cout << "*p:"  << *p << std::endl; 
                         return ParseResult::ok;
                     } else {
-                        kvp_.reset(); //TODO: needed?
-                        status_ = Status::key_value;
+                        vp_.reset(); //TODO: needed?
+                        status_ = Status::value;
                     }
                 }
                 break;

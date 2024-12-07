@@ -90,6 +90,8 @@ public:
     virtual void numbrer_value(int integer, int frac, int exp) =0;
     virtual void begin_object() =0;
     virtual void end_object() =0;
+    virtual void begin_array() =0;
+    virtual void end_array() =0;
 
 private:
 };
@@ -174,6 +176,7 @@ private:
 };
 
 class ObjectParser;
+class ArrayParser;
 
 class ValueParser: public JsonParser {
 public:
@@ -199,6 +202,7 @@ private:
     NumberParser number_parser_;
     StringParser string_parser_;
     std::unique_ptr<ObjectParser> object_parser_;
+    std::unique_ptr<ArrayParser> array_parser_;
 
     bool bvalue_;
     int integer_;
@@ -260,13 +264,25 @@ public:
     ParseResult parse(const char*& p, const char* end) override;
     void reset();
 private:
-    enum class Status {begin, key_value, ws1, sep, ws2};
+    enum class Status {begin, ws0, key_value, ws1, sep, ws2};
     Status status_;
     JsonVisitorBase& visitor_;
     KeyValueParser kvp_;
     WhiteSpaceParser wsp_;
 };
 
+class ArrayParser: public JsonParser {
+public:
+    ArrayParser(JsonVisitorBase& visitor);
+    ParseResult parse(const char*& p, const char* end) override;
+    void reset();
+private:
+    enum class Status {begin, value, ws1, sep, ws2};
+    Status status_;
+    JsonVisitorBase& visitor_;
+    ValueParser vp_;
+    WhiteSpaceParser wsp_;
+};
 
 
 }// namespace libacpp::json
