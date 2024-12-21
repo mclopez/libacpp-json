@@ -1,6 +1,7 @@
 
 add_library(
     acppJson
+    utils.cpp
     parser.cpp
 )
 
