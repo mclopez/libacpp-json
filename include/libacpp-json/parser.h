@@ -5,9 +5,10 @@
 //          https://www.mozilla.org/en-US/MPL/2.0/)
 
 #pragma once
+//TODO: REMOVE this
+#include <iostream>
 
-#include <string>
-#include <vector>
+#include "log.h"
 
 namespace libacpp::json {
 
@@ -16,157 +17,120 @@ enum class ParseResult {ok, partial, error};
 std::string to_string(ParseResult r);
 
 
-enum class ValueType {undef, nil, boolean, number, string, object, array};
+#if __cpp_concepts 
+    #define REQUIRES(...) requires __VA_ARGS__
+#else
+    #define REQUIRES(...) // No-op if concepts are not supported
+#endif
 
-class Value {
-public:
-    Value(ValueType type):type_(type){}
-    ValueType type() {return type_;}
-    virtual std::string to_string()=0;
-//    bool operator ==(const Value& v) {return type_ == v.type_};
-protected:
-    ValueType type_; 
+#if __cpp_concepts 
+
+template <typename T, bool is_key>
+concept StringConsumerConcept = 
+    (requires(T t) {
+        
+        t.key_begin();
+        t.add_char_key('a');
+        t.key_end();    
+
+        // t.string_begin(true);
+        // t.add_char_string('a');
+        // t.string_end();    
+    } && (is_key))
+    || 
+    (requires(T t) {
+        t.string_begin();
+        t.add_char_string('a');
+        t.string_end();    
+    } && (!is_key));
+
+template <typename T>
+concept NumberConsumerConcept = requires(T t) {
+    t.number_begin();
+    t.sing(-1);
+    t.add_char_int('0');
+    t.add_char_frac('0');
+    t.add_char_exp('0');
+    t.number_end();
 };
 
-// templat<typename V1. typename V2>
-// bool operator ==(const Value& v1, const Value& v2) {
-//     return type_ == v.type_
+template <typename T>
+concept ValueConsumerConcept = requires(T t) {
+    t.set_bool(true);
+    t.set_null();
+    (typename T::NumberConsumerType&)t.number_consumer();
+    (typename T::StringConsumerType&)t.string_consumer();
+    (typename T::ObjectConsumerType&)t.object_consumer();
+    (typename T::ArrayConsumerType&)t.array_consumer();    
+};  
 
-// };
+
+template <typename T>
+concept KeyValueConsumerConcept = requires(T t) {
+    (typename T::KeyConsumerType&)t.key_consumer();
+    (typename T::ValueConsumerType&)t.value_consumer();
+};  
 
 
-class NullValue: public Value {
+
+template <typename T>
+concept ObjectConsumerConcept = requires(T t) {
+    t.object_begin();
+    t.object_end();
+    (typename T::KeyConsumerType&)t.key_consumer();
+    (typename T::ValueConsumerType&)t.value_consumer();
+};  
+
+template <typename T>
+concept ArrayConsumerConcept = requires(T t) {
+    t.array_begin();
+    t.array_end();
+    (typename T::ValueConsumerType&)t.value_consumer();
+};  
+
+#endif
+
+
+
+template<typename Consumer, bool IsKey = false>
+REQUIRES( StringConsumerConcept<Consumer, IsKey> )
+class StringParser 
+{
 public:
-    NullValue():Value(ValueType::nil){}
-    std::string to_string() override {return "null";}
-private:
-};
-
-//TODO: template impl??
-class BoolValue: public Value {
-public:
-    BoolValue(bool v):Value(ValueType::boolean), value_(v){}
-    bool value() const { return value_;}
-    std::string to_string() override {return value_?"true":"false";}
-private:
-    bool value_;
-};
-
-class StringValue: public Value {
-public:
-    StringValue(const std::string& v):Value(ValueType::string), value_(v){}
-    std::string value() const { return value_;}
-    std::string to_string() override {return std::string("\"") + value_ + "\"";}
-private:
-    std::string value_;
-};
-
-class NumberValue: public Value {
-public:
-    NumberValue(int i, int f, int e):Value(ValueType::number), integer_(i), fraction_(f), exponent_(e){}
-    int value() const { return integer_;}
-    std::string to_string() override {return  std::to_string(integer_) + "/" + std::to_string(fraction_) + "/" + std::to_string(exponent_);}
-private:
-    int integer_;
-    int fraction_;
-    int exponent_;
-};
-
-class JsonParser {
-public:    
-    virtual ParseResult parse(const char*& p, const char* end) = 0;
-};
-
-class JsonVisitorBase {
-public:
-
-//    virtual std::string& current_key() =0;
-//    virtual void current_key(std::string&) =0;
-
-    virtual void key(std::string&) =0;
-    virtual void null_value() =0;
-    virtual void string_value(std::string& value) =0;
-    virtual void bool_value(bool value) =0;
-    virtual void numbrer_value(int integer, int frac, int exp) =0;
-    virtual void begin_object() =0;
-    virtual void end_object() =0;
-    virtual void begin_array() =0;
-    virtual void end_array() =0;
-
-private:
-};
-
-/*
-class JsonVisitor: public JsonVisitorBase {
-public:
-    std::string& current_key() override { return current_key_;}
-//    void current_key(std::string& ck) override { current_key_ = ck;}//TODO: needed???
-
-    void string_value(std::string& key, std::string& value) override {
-        std::cout << "JsonVisitor::string_value: ";
-        for (int i=0; i<indent_;++i )
-            std::cout << '\t';
-        std::cout << key << " : " << value << "\n"; 
-    }
-    void begin_object() override {
-        std::cout << "JsonVisitor::begin_object:";
-        for (int i=0; i<indent_;++i )
-            std::cout << '\t';
-        std::cout << current_key_;
-        ++indent_;
-    }
-    void end_object() override {
-        std::cout << "JsonVisitor::end_object: ";
-        --indent_;
-        for (int i=0; i<indent_;++i )
-            std::cout << '\t';
-        std::cout << current_key_;
-    }
-
-private:
-    int indent_=0;
-    std::string current_key_;
-};
-
-*/
-
-
-
-
-std::vector<uint8_t> unicode_to_tf8(uint32_t codepoint);
-
-class StringParser: public JsonParser {
-public:
-    StringParser(std::string& result):result_(result), status_(Status::begin), uniCount_(0), unicode_(1) {}
-    ParseResult parse(const char*& p, const char* end) override; 
+    StringParser(Consumer& consumer, bool is_key = false):status_(Status::begin), uniCount_(0), unicode_(1), consumer_(consumer) {}
+    ParseResult parse(const char*& p, const char* end);
     void reset() { status_ = Status::begin;}
-
+    Consumer& consumer() {return consumer_;}
 private:
     enum class Status {begin, middle, escape, unicode, uni4end};
+    void add_char(char c);
     Status status_;
-    std::string& result_;
     int uniCount_;
     uint32_t unicode_;
+    Consumer& consumer_;
 };
 
-class NumberParser: public JsonParser {
+
+
+template <typename Consumer>
+REQUIRES( ValueConsumerConcept<Consumer> )
+class NumberParser  {
 public:
-    NumberParser(int& result, int& frac, int& exp):result_(result), frac_(frac), exp_(exp), status_(Status::begin), sign_(1){}
-    ParseResult parse(const char*& p, const char* end) override; 
+    NumberParser(Consumer& consumer): status_(Status::begin), consumer_(consumer){}
+    ParseResult parse(const char*& p, const char* end); 
     void reset() { status_ = Status::begin;}
+    Consumer& consumer() { return consumer_; }
 private:
     enum class Status {begin, integer, frac, frac2, exp, exp_first_digit, exp_digits};
     Status status_;
-    int& result_;
-    int sign_;
-    int& frac_;
-    int& exp_;
+    Consumer& consumer_;
 };
 
-class LiteralParser: public JsonParser {
+
+class LiteralParser {
 public:
     LiteralParser(const std::string& literal):pos_(0), literal_(literal){}
-    ParseResult parse(const char*& p, const char* end) override; 
+    ParseResult parse(const char*& p, const char* end);
 
     void reset() { pos_=0;}
 
@@ -175,20 +139,32 @@ private:
     const std::string& literal_;
 };
 
+
+enum class ValueType {undef, nil, boolean, number, string, object, array};
+
+template<typename Consumer> 
+REQUIRES(ObjectConsumerConcept<Consumer>)
 class ObjectParser;
+
+template<typename Consumer> 
+REQUIRES(ArrayConsumerConcept<Consumer>)
 class ArrayParser;
 
-class ValueParser: public JsonParser {
+template<typename Consumer>
+REQUIRES(ValueConsumerConcept<Consumer>)
+class ValueParser {
 public:
-    ValueParser(JsonVisitorBase& v)
-    :status_(Status::begin),
-    null_parser_(null_val),true_parser_(true_val), false_parser_(false_val),
-    number_parser_(integer_, frac_, exp_), string_parser_(string_), type_(ValueType::undef), visitor_(v)
-    {}
-    ParseResult parse(const char*& p, const char* end) override; 
-    std::unique_ptr<Value> value() const;
+    ValueParser(Consumer& consumer): 
+        status_(Status::begin),
+        null_parser_(null_val),true_parser_(true_val), false_parser_(false_val),
+        consumer_(consumer),
+        number_parser_(consumer.number_consumer()),
+        string_parser_(consumer.string_consumer())
+        {}
+    ParseResult parse(const char*& p, const char* end); 
 
     void reset();
+
 private:
     enum class Status {begin, true_val, false_val, null_val, number, string, object, array};
     Status status_;
@@ -199,27 +175,25 @@ private:
     LiteralParser null_parser_;
     LiteralParser true_parser_;
     LiteralParser false_parser_;
-    NumberParser number_parser_;
-    StringParser string_parser_;
-    std::unique_ptr<ObjectParser> object_parser_;
-    std::unique_ptr<ArrayParser> array_parser_;
+    NumberParser<typename Consumer::NumberConsumerType> number_parser_;
+    StringParser<typename Consumer::StringConsumerType, false> string_parser_;
 
-    bool bvalue_;
-    int integer_;
-    int frac_;
-    int exp_;
-    std::string string_;
+    std::unique_ptr<ObjectParser<typename Consumer::ObjectConsumerType>> object_parser_;
+    std::unique_ptr<ArrayParser<typename Consumer::ArrayConsumerType>> array_parser_;
 
-    ValueType type_;
-    JsonVisitorBase& visitor_;
+    Consumer& consumer_;
 };
 
+inline void log_p(const char*& p, int c) {
+    std::cout <<"log_p " << c << " " << (long int) p << std::endl;
+}
 
-class WhiteSpaceParser: public JsonParser {
+class WhiteSpaceParser {
 public:
     WhiteSpaceParser() = default;
 
     ParseResult parse(const char*& p, const char* end)  {
+        std::cout << "WhiteSpaceParser::parse P" << (long int) p  << std::endl;
         while (p != end) {
             if (!is_ws(*p)) 
                 return ParseResult::ok;
@@ -235,54 +209,69 @@ private:
 };
 
 
-class KeyValueParser: public JsonParser {
+template<typename Consumer>
+REQUIRES(KeyValueConsumerConcept<Consumer>)
+class KeyValueParser {
 public:
-    KeyValueParser(JsonVisitorBase& v)
-    : status_(Status::ws1), kp_(key_), visitor_(v), vp_(v) {
-
+    KeyValueParser(Consumer& consumer)
+        : status_(Status::ws1), consumer_(consumer), 
+        kp_(consumer.key_consumer(), true), 
+        vp_(consumer.value_consumer()) {
     }
+
     ParseResult parse(const char*& p, const char* end);
-    void reset() {
-        key_ = "";
-        status_ = Status::ws1;
-        vp_.reset();
 
+    void reset() {
+        status_ = Status::ws1;
     }
+
+    Consumer& consumer() {return consumer_;}
+
 private:
     enum class Status {ws1, key, ws2, sep, ws3, value};
     Status status_;
-    std::string key_;
     WhiteSpaceParser wsp_;
-    StringParser kp_;
-    ValueParser vp_;
-    JsonVisitorBase& visitor_;
+
+    StringParser<typename Consumer::KeyConsumerType, true> kp_;
+    ValueParser<typename Consumer::ValueConsumerType> vp_;
+
+    Consumer& consumer_;
 };
 
-class ObjectParser: public JsonParser {
+
+template<typename Consumer>
+REQUIRES(ObjectConsumerConcept<Consumer>)
+class ObjectParser {
 public:
-    ObjectParser(JsonVisitorBase& visitor);
-    ParseResult parse(const char*& p, const char* end) override;
+    ObjectParser(Consumer& consumer);
+    ParseResult parse(const char*& p, const char* end);
     void reset();
 private:
     enum class Status {begin, ws0, key_value, ws1, sep, ws2};
     Status status_;
-    JsonVisitorBase& visitor_;
-    KeyValueParser kvp_;
+    KeyValueParser<typename Consumer::KeyValueConsumerType> kvp_;
     WhiteSpaceParser wsp_;
+    Consumer& consumer_;
 };
 
-class ArrayParser: public JsonParser {
+template<typename Consumer>
+REQUIRES(ArrayConsumerConcept<Consumer>)
+class ArrayParser {
 public:
-    ArrayParser(JsonVisitorBase& visitor);
-    ParseResult parse(const char*& p, const char* end) override;
+    ArrayParser(Consumer& consumer);
+    ParseResult parse(const char*& p, const char* end);
     void reset();
 private:
     enum class Status {begin, value, ws1, sep, ws2};
     Status status_;
-    JsonVisitorBase& visitor_;
-    ValueParser vp_;
+    ValueParser<typename Consumer::ValueConsumerType> vp_;
     WhiteSpaceParser wsp_;
+    Consumer& consumer_;
 };
 
 
-}// namespace libacpp::json
+
+} // namespace libacpp::json
+
+
+#include "parser.inl"
