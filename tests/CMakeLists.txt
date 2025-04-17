@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_executable(acppJsonTests
     main.cpp
     parser_test.cpp
+    reflection_test.cpp
 )
 
 target_include_directories(acppJsonTests 

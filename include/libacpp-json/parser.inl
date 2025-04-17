@@ -83,7 +83,7 @@ ParseResult StringParser<Consumer, is_key>::parse(const char*& p, const char* en
                     return ParseResult::error;
                 } 
                 if (uniCount_ == 4) {
-                    auto str = unicode_to_tf8(unicode_);
+                    auto str = unicode_to_utf8(unicode_);
                     for (auto c: str)
                         add_char((char)c);
                     status_ = Status::middle;

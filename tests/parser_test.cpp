@@ -193,7 +193,7 @@ bool sync_test = true;
 bool async_test = true;
 
 
-TEST(ParserTests2, String)
+TEST(ParserTests, String)
 {
 struct Test {
     std::string input;
@@ -238,7 +238,7 @@ struct Test {
 }
 
 
-TEST(ParserTests2, Number)
+TEST(ParserTests, Number)
 {
 struct Test {
     std::string input;
@@ -327,7 +327,7 @@ tests[]{
 }
 
 
-TEST(ParserTests2, Literal)
+TEST(ParserTests, Literal)
 {
     struct Test {
         std::string value;
@@ -409,7 +409,7 @@ std::string to_string(ValueConsumer& vc) {
     return ss.str();
 } 
 
-TEST(ParserTests2, Value)
+TEST(ParserTests, Value)
 {
     struct Test {
         std::string input;
@@ -486,7 +486,7 @@ std::string key_value_to_string(JsonConsumer& c) {
     return ss.str();
 }
 
-TEST(ParserTests2, KeyValue)
+TEST(ParserTests, KeyValue)
 {
     struct Test {
         std::string input;
@@ -562,7 +562,7 @@ TEST(ParserTests2, KeyValue)
 
 
 
-TEST(ParserTests2, Object)
+TEST(ParserTests, Object)
 {
     struct Test {
         std::string input;
@@ -647,7 +647,7 @@ TEST(ParserTests2, Object)
 
 
 
-TEST(ParserTests2, Array)
+TEST(ParserTests, Array)
 {
     struct Test {
         std::string input;
@@ -712,7 +712,7 @@ TEST(ParserTests2, Array)
 
 
 
-TEST(ParserTests2, Full)
+TEST(ParserTests, Full)
 {
     struct Test {
         std::string input;
