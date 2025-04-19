@@ -12,7 +12,7 @@ namespace libacpp::json {
 
 ParseResult LiteralParser::parse(const char*& p, const char* end) {
     while(p != end) {
-        std::cout << "LiteralParser::parse " << literal_ << " " << *p << " p:"  << (void*)p << " end:"  << (void*)end << std::endl;
+        //std::cout << "LiteralParser::parse " << literal_ << " " << *p << " p:"  << (void*)p << " end:"  << (void*)end << std::endl;
         if (*p != literal_[pos_]) {
             //std::cout << "LiteralParser::parse " << literal_ << " error" << std::endl;
             return ParseResult::error;

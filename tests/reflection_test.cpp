@@ -63,5 +63,5 @@ TEST(RelectionTests, test1) {
     EXPECT_EQ((get_prop_value<test1, int>(t1, "m3")), 6);
     set_prop_value(t1, "m3", 7);
     EXPECT_EQ((get_prop_value<test1, int>(t1, "m3")), 7);
-    
+
 }
