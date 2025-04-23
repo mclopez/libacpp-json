@@ -185,7 +185,7 @@ private:
 };
 
 inline void log_p(const char*& p, int c) {
-    std::cout <<"log_p " << c << " " << (long int) p << std::endl;
+    //std::cout <<"log_p " << c << " " << (long int) p << std::endl;
 }
 
 class WhiteSpaceParser {
@@ -193,7 +193,7 @@ public:
     WhiteSpaceParser() = default;
 
     ParseResult parse(const char*& p, const char* end)  {
-        std::cout << "WhiteSpaceParser::parse P" << (long int) p  << std::endl;
+        //std::cout << "WhiteSpaceParser::parse P" << (long int) p  << std::endl;
         while (p != end) {
             if (!is_ws(*p)) 
                 return ParseResult::ok;

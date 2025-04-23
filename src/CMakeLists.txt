@@ -3,6 +3,7 @@ add_library(
     acppJson
     utils.cpp
     parser.cpp
+    consumer.cpp
 )
 
 target_include_directories(acppJson PUBLIC

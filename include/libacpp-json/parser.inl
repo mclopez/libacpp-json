@@ -24,7 +24,7 @@ void StringParser<Consumer, is_key>::add_char(char c) {
 template <typename Consumer, bool is_key>
 ParseResult StringParser<Consumer, is_key>::parse(const char*& p, const char* end) {
     while(p != end) {
-        std::cout << "StringParser::parse *p: " << *p << " " << (long int)p  << " " << (long int)end << std::endl;
+        //std::cout << "StringParser::parse *p: " << *p << " " << (long int)p  << " " << (long int)end << std::endl;
         switch(status_) {
             uint8_t v;
             case Status::begin:
@@ -101,7 +101,7 @@ ParseResult StringParser<Consumer, is_key>::parse(const char*& p, const char* en
 template <typename Consumer>
 ParseResult NumberParser<Consumer>::parse(const char*& p, const char* end) {
     while(p != end) {
-        std::cout << "NumberParser::parse *p: " << *p << " status_: " << (int)status_  << " "<<(long int) p << " " << (long int) end << std::endl;
+        ///std::cout << "NumberParser::parse *p: " << *p << " status_: " << (int)status_  << " "<<(long int) p << " " << (long int) end << std::endl;
         switch(status_) {
             case Status::begin:
                 consumer_.number_begin();
@@ -233,10 +233,10 @@ ParseResult ValueParser<Consumer>::parse(const char*& p, const char* end) {
 
     ParseResult r = ParseResult::partial;
     guard g;
-        std::cout << "ValueParser::parse begin: " << (long int)p << " " << (long int)end << " status_: " << (int)status_ << std::endl;
+        //std::cout << "ValueParser::parse begin: " << (long int)p << " " << (long int)end << " status_: " << (int)status_ << std::endl;
     while(p < end && r != ParseResult::ok) {
         g.current(p);
-        std::cout << "ValueParser::parse " << *p << " p:" << (long int)p  << " end:" << (long int)end  << " r: " << (int)r << " status_: " << (int)status_ << std::endl;
+        //std::cout << "ValueParser::parse " << *p << " p:" << (long int)p  << " end:" << (long int)end  << " r: " << (int)r << " status_: " << (int)status_ << std::endl;
         switch(status_) {
             case Status::begin:
                 //null
@@ -328,21 +328,21 @@ ParseResult ValueParser<Consumer>::parse(const char*& p, const char* end) {
                 }
                 break;
             case Status::string:
-                std::cout <<"string_parser_.parse p:" << (long int) p  << " e: "<< (long int) end << std::endl;
+                //std::cout <<"string_parser_.parse p:" << (long int) p  << " e: "<< (long int) end << std::endl;
                 r = string_parser_.parse(p, end);
                 if (r == ParseResult::ok) {
 //                    consumer_.set_string();
                 }
                 break;
             case Status::object:
-                std::cout <<"object_parser_.parse p:" << (long int) p  << " e: "<< (long int) end << std::endl;
+                //std::cout <<"object_parser_.parse p:" << (long int) p  << " e: "<< (long int) end << std::endl;
                 r = object_parser_->parse(p, end);
                 if (r == ParseResult::ok) {
                     //type_ = ValueType::object;
                 }
                 break;
             case Status::array:
-                std::cout <<"object_parser_.parse p:" << (long int) p  << " e: "<< (long int) end << std::endl;
+                //std::cout <<"object_parser_.parse p:" << (long int) p  << " e: "<< (long int) end << std::endl;
                 r = array_parser_->parse(p, end);
                 if (r == ParseResult::ok) {
                     //type_ = ValueType::object;
@@ -359,9 +359,9 @@ ParseResult ValueParser<Consumer>::parse(const char*& p, const char* end) {
 
 template<typename Consumer>
 ParseResult KeyValueParser<Consumer>::parse(const char*& p, const char* end)  {
-    std::cout << "KeyValueParser::parse sep p:"  << (long int)p << " end:"  << (long int)end  << std::endl; 
+    //std::cout << "KeyValueParser::parse sep p:"  << (long int)p << " end:"  << (long int)end  << std::endl; 
     while(p != end) {
-        std::cout << "KeyValueParser::parse *p: " << *p << " " << (long int)p << " " << (long int)end  << " " << " status_: " << (int)status_ << std::endl;
+        //std::cout << "KeyValueParser::parse *p: " << *p << " " << (long int)p << " " << (long int)end  << " " << " status_: " << (int)status_ << std::endl;
         ParseResult result = ParseResult::partial;
         switch(status_) {
             case Status::ws1:
@@ -377,7 +377,7 @@ ParseResult KeyValueParser<Consumer>::parse(const char*& p, const char* end)  {
                 }
                 break;
             case Status::ws2:
-                std::cout << "KeyValueParser::parse ws2 *p:"  << *p << std::endl; 
+                //std::cout << "KeyValueParser::parse ws2 *p:"  << *p << std::endl; 
                 result = wsp_.parse(p, end);
                 if (result == ParseResult::ok)
                     status_ = Status::sep;
@@ -401,7 +401,7 @@ ParseResult KeyValueParser<Consumer>::parse(const char*& p, const char* end)  {
                 }
                 break;
             case Status::value:
-                std::cout << "KeyValueParser::parse value *p:"  << *p << std::endl; 
+                //std::cout << "KeyValueParser::parse value *p:"  << *p << std::endl; 
                 result = vp_.parse(p, end);
                 if (result == ParseResult::ok) {
                     status_ = Status::ws1;
@@ -413,7 +413,7 @@ ParseResult KeyValueParser<Consumer>::parse(const char*& p, const char* end)  {
                 break;
         }
         if (result == ParseResult::error) {
-            std::cout << "KeyValueParser::parse error" << std::endl; 
+            //std::cout << "KeyValueParser::parse error" << std::endl; 
             return result;    
         }
     }
@@ -429,16 +429,16 @@ void ObjectParser<Consumer>::reset() {
 template<typename Consumer>
 ObjectParser<Consumer>::ObjectParser(Consumer& consumer)
 :status_(Status::begin), consumer_(consumer), kvp_(consumer) {
-    std::cout << "ObjectParser::ObjectParser  NEW"  << std::endl;
+    //std::cout << "ObjectParser::ObjectParser  NEW"  << std::endl;
 }
 
 
 template<typename Consumer>
 ParseResult ObjectParser<Consumer>::parse(const char*& p, const char* end) {
-    std::cout << "ObjectParser::parse *** p: " << (long int)p << " end: " << (long int)end << std::endl;
+    //std::cout << "ObjectParser::parse *** p: " << (long int)p << " end: " << (long int)end << std::endl;
     ParseResult result = ParseResult::partial;
     while(p != end) {
-        std::cout << "ObjectParser::parse *p: " << *p  << " status: " << (int)status_ << " p " << (long int)p << " end: " << (long int)end << std::endl;
+        //std::cout << "ObjectParser::parse *p: " << *p  << " status: " << (int)status_ << " p " << (long int)p << " end: " << (long int)end << std::endl;
         ParseResult r;
         switch(status_) {
             case Status::begin:
@@ -466,9 +466,9 @@ ParseResult ObjectParser<Consumer>::parse(const char*& p, const char* end) {
                 }
                 break;
             case Status::key_value:
-                std::cout << "ObjectParser::parse keyvalue (1) *p: " << *p  << " status: " << (int)status_  << " p:" << (long int) p << std::endl;
+                //std::cout << "ObjectParser::parse keyvalue (1) *p: " << *p  << " status: " << (int)status_  << " p:" << (long int) p << std::endl;
                 r = kvp_.parse(p, end);
-                std::cout << "ObjectParser::parse keyvalue (2) *p: " << *p  << " status: " << (int)status_  << " p:" << (long int) p << std::endl;
+                //std::cout << "ObjectParser::parse keyvalue (2) *p: " << *p  << " status: " << (int)status_  << " p:" << (long int) p << std::endl;
                 if (r == ParseResult::ok) {
                     if (*p == '}') {
                         consumer_.object_end();
@@ -539,7 +539,7 @@ ParseResult ObjectParser<Consumer>::parse(const char*& p, const char* end) {
 template<typename Consumer>
 ArrayParser<Consumer>::ArrayParser(Consumer& consumer)
 :consumer_(consumer), vp_(consumer), status_(Status::begin) {
-    std::cout << "ArrayParser::ArrayParser  NEW"  << std::endl;
+    //std::cout << "ArrayParser::ArrayParser  NEW"  << std::endl;
 }
 
 template<typename Consumer>
@@ -550,10 +550,10 @@ void ArrayParser<Consumer>::reset() {
 
 template<typename Consumer>
 ParseResult ArrayParser<Consumer>::parse(const char*& p, const char* end) {
-    std::cout << "ArrayParser::parse p: " << (long int) p << " end: " << (long int)end << std::endl;
+    //std::cout << "ArrayParser::parse p: " << (long int) p << " end: " << (long int)end << std::endl;
     ParseResult result = ParseResult::partial;
     while(p != end) {
-        std::cout << "ArrayParser::parse *p: " << *p  << " status: " << (int)status_ << " p: " << (long int) p << " end: " << (long int)end << std::endl;
+        //std::cout << "ArrayParser::parse *p: " << *p  << " status: " << (int)status_ << " p: " << (long int) p << " end: " << (long int)end << std::endl;
         switch(status_) {
             case Status::begin:
                 if (*p != '[') {
@@ -566,7 +566,7 @@ ParseResult ArrayParser<Consumer>::parse(const char*& p, const char* end) {
                     return ParseResult::partial;
                 break;
             case Status::value:
-                        std::cout << "ArrayParser::parse value(1) *********** end p" << (long int) p << std::endl;
+                //std::cout << "ArrayParser::parse value(1) *********** end p" << (long int) p << std::endl;
                 if (vp_.parse(p, end) == ParseResult::ok) {
                     // if (*p == ']') {
                     //     std::cout << "ArrayParser::parse value(2) *********** end p" << (long int) p << std::endl;
@@ -575,7 +575,8 @@ ParseResult ArrayParser<Consumer>::parse(const char*& p, const char* end) {
                     //     ++p; log_p(p, 10);
                     //     return ParseResult::ok;
                     // }
-                    std::cout << "ArrayParser::parse value *********** " << std::endl;
+                    
+                    //std::cout << "ArrayParser::parse value *********** " << std::endl;
                     status_ = Status::ws1;
                 }
                 break;
