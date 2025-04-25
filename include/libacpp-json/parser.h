@@ -17,7 +17,7 @@ enum class ParseResult {ok, partial, error};
 std::string to_string(ParseResult r);
 
 
-#if __cpp_concepts 
+#if __cpp_concepts
     #define REQUIRES(...) requires __VA_ARGS__
 #else
     #define REQUIRES(...) // No-op if concepts are not supported
@@ -43,6 +43,7 @@ concept StringConsumerConcept =
         t.add_char_string('a');
         t.string_end();    
     } && (!is_key));
+
 
 template <typename T>
 concept NumberConsumerConcept = requires(T t) {
