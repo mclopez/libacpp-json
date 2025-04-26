@@ -14,6 +14,7 @@ namespace libacpp::json {
 
 
 template <typename Consumer, bool is_key>
+REQUIRES( StringConsumerConcept<Consumer, is_key> )
 void StringParser<Consumer, is_key>::add_char(char c) {
     if constexpr (is_key)
         consumer_.add_char_key(c);
@@ -22,6 +23,7 @@ void StringParser<Consumer, is_key>::add_char(char c) {
 }
 
 template <typename Consumer, bool is_key>
+REQUIRES( StringConsumerConcept<Consumer, is_key> )
 ParseResult StringParser<Consumer, is_key>::parse(const char*& p, const char* end) {
     while(p != end) {
         //std::cout << "StringParser::parse *p: " << *p << " " << (long int)p  << " " << (long int)end << std::endl;
@@ -99,6 +101,7 @@ ParseResult StringParser<Consumer, is_key>::parse(const char*& p, const char* en
 
 
 template <typename Consumer>
+REQUIRES( ValueConsumerConcept<Consumer> )
 ParseResult NumberParser<Consumer>::parse(const char*& p, const char* end) {
     while(p != end) {
         ///std::cout << "NumberParser::parse *p: " << *p << " status_: " << (int)status_  << " "<<(long int) p << " " << (long int) end << std::endl;
@@ -195,14 +198,18 @@ ParseResult NumberParser<Consumer>::parse(const char*& p, const char* end) {
 }
 
 template<typename Consumer>
+REQUIRES(ValueConsumerConcept<Consumer>)
 const std::string ValueParser<Consumer>::null_val = "null";
 template<typename Consumer>
+REQUIRES(ValueConsumerConcept<Consumer>)
 const std::string ValueParser<Consumer>::true_val = "true";
 template<typename Consumer>
+REQUIRES(ValueConsumerConcept<Consumer>)
 const std::string ValueParser<Consumer>::false_val = "false";
 
 
 template <typename Consumer>
+REQUIRES(ValueConsumerConcept<Consumer>)
 void ValueParser<Consumer>::reset() {
     status_ = Status::begin;
     // if (object_parser_)
@@ -221,13 +228,14 @@ struct guard {
     const char* current_ = nullptr;
     void current(const char* p) { 
         if (current_ == p) 
-            throw std::runtime_error("infinit loop at " + std::to_string((long int)p));
+            throw std::runtime_error("infinit loop at " + std::to_string((uint64_t)p));
         else 
             current_ = p;
         }
 };
 
 template <typename Consumer>
+REQUIRES(ValueConsumerConcept<Consumer>)
 ParseResult ValueParser<Consumer>::parse(const char*& p, const char* end) {
     //std::cout <<"ValueParser::parse \n";
 
@@ -358,6 +366,7 @@ ParseResult ValueParser<Consumer>::parse(const char*& p, const char* end) {
 }
 
 template<typename Consumer>
+REQUIRES(KeyValueConsumerConcept<Consumer>)
 ParseResult KeyValueParser<Consumer>::parse(const char*& p, const char* end)  {
     //std::cout << "KeyValueParser::parse sep p:"  << (long int)p << " end:"  << (long int)end  << std::endl; 
     while(p != end) {
@@ -422,11 +431,13 @@ ParseResult KeyValueParser<Consumer>::parse(const char*& p, const char* end)  {
 
 
 template<typename Consumer>
+REQUIRES(ObjectConsumerConcept<Consumer>)
 void ObjectParser<Consumer>::reset() {
     status_ = Status::begin;
 }
 
 template<typename Consumer>
+REQUIRES(ObjectConsumerConcept<Consumer>)
 ObjectParser<Consumer>::ObjectParser(Consumer& consumer)
 :status_(Status::begin), consumer_(consumer), kvp_(consumer) {
     //std::cout << "ObjectParser::ObjectParser  NEW"  << std::endl;
@@ -434,6 +445,7 @@ ObjectParser<Consumer>::ObjectParser(Consumer& consumer)
 
 
 template<typename Consumer>
+REQUIRES(ObjectConsumerConcept<Consumer>)
 ParseResult ObjectParser<Consumer>::parse(const char*& p, const char* end) {
     //std::cout << "ObjectParser::parse *** p: " << (long int)p << " end: " << (long int)end << std::endl;
     ParseResult result = ParseResult::partial;
@@ -537,18 +549,21 @@ ParseResult ObjectParser<Consumer>::parse(const char*& p, const char* end) {
 
 
 template<typename Consumer>
+REQUIRES(ArrayConsumerConcept<Consumer>)
 ArrayParser<Consumer>::ArrayParser(Consumer& consumer)
 :consumer_(consumer), vp_(consumer), status_(Status::begin) {
     //std::cout << "ArrayParser::ArrayParser  NEW"  << std::endl;
 }
 
 template<typename Consumer>
+REQUIRES(ArrayConsumerConcept<Consumer>)
 void ArrayParser<Consumer>::reset() {
     status_ = Status::begin;
 }
 
 
 template<typename Consumer>
+REQUIRES(ArrayConsumerConcept<Consumer>)
 ParseResult ArrayParser<Consumer>::parse(const char*& p, const char* end) {
     //std::cout << "ArrayParser::parse p: " << (long int) p << " end: " << (long int)end << std::endl;
     ParseResult result = ParseResult::partial;
