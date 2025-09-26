@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash 
 
 #./conan_helper.sh
 conan install . --output-folder=build/linux --build=missing -s build_type=Release
