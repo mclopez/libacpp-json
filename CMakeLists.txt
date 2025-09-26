@@ -1,21 +1,30 @@
 cmake_minimum_required(VERSION 3.15)
-project(libacpp-json)
+project(acpp-json VERSION 0.1.0)
 
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-
-# Conan integration
-#include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
-#conan_basic_setup()
-
-
-include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake)
-
 
 find_package(GTest REQUIRED)
 find_package(spdlog REQUIRED)
 
 
 add_subdirectory(src)
-add_subdirectory(tests)
+
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+    add_subdirectory(tests)
+else()
+    message(WARNING "Tests directory 'tests' not found - skipping tests")
+endif()
+
+
+
+install(TARGETS acppJson DESTINATION lib)
+
+install(DIRECTORY include/libacpp-json/
+        DESTINATION include/libacpp-json/
+        FILES_MATCHING
+        PATTERN "*.h"
+        PATTERN "*.inl"
+        PATTERN "*.hpp")
